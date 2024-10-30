@@ -5,6 +5,7 @@ import {
   isAssetOfKind,
 } from '@bscotch/gml-parser';
 import { Pathy } from '@bscotch/pathy';
+import { YyResourceType } from '@bscotch/yy';
 import vscode from 'vscode';
 import { getAssetIcon } from './icons.mjs';
 import { StitchTreeItemBase, setEventIcon } from './tree.base.mjs';
@@ -14,12 +15,20 @@ export type Treeable =
   | TreeAsset
   | TreeCode
   | TreeSpriteFrame
+  | TreeRoomInstance
   | TreeShaderFile
   | TreeFilterGroup
   | TreeFilter
   | GameMakerFolder;
 
 // ICONS: See https://code.visualstudio.com/api/references/icons-in-labels#icon-listing
+
+export function isTreeAssetOfKind(
+  item: any,
+  kind: YyResourceType,
+): item is TreeAsset<YyResourceType> {
+  return item instanceof TreeAsset && isAssetOfKind(item.asset, kind);
+}
 
 export class TreeFilterGroup extends StitchTreeItemBase<'tree-filter-group'> {
   override readonly kind = 'tree-filter-group';
@@ -96,15 +105,17 @@ export class TreeFilter extends StitchTreeItemBase<'tree-filter'> {
   }
 }
 
-export class TreeAsset extends StitchTreeItemBase<'asset'> {
+export class TreeAsset<
+  T extends YyResourceType = YyResourceType,
+> extends StitchTreeItemBase<'asset'> {
   override readonly kind = 'asset';
-  readonly asset: Asset;
+  readonly asset: Asset<T>;
   /** Asset:TreeItem lookup, for revealing items and filtering.  */
   static lookup: Map<Asset, TreeAsset> = new Map();
 
   constructor(
     readonly parent: GameMakerFolder,
-    asset: Asset,
+    asset: Asset<T>,
   ) {
     super(asset.name);
     this.contextValue = `asset-${asset.assetKind}`;
@@ -151,7 +162,7 @@ export class TreeAsset extends StitchTreeItemBase<'asset'> {
       };
     }
 
-    this.collapsibleState = ['objects', 'sprites', 'shaders'].includes(
+    this.collapsibleState = ['objects', 'sprites', 'shaders', 'rooms'].includes(
       this.asset.assetKind,
     )
       ? vscode.TreeItemCollapsibleState.Collapsed
@@ -238,5 +249,39 @@ export class TreeShaderFile extends StitchTreeItemBase<'shader-file'> {
   }
   get uri() {
     return vscode.Uri.file(this.path.absolute);
+  }
+}
+
+export class TreeRoomInstance extends StitchTreeItemBase<'room-instance'> {
+  override readonly kind = 'room-instance';
+  constructor(
+    readonly parent: TreeAsset<'rooms'>,
+    readonly asset: Asset<'objects'>,
+    readonly instanceId: string,
+  ) {
+    super(asset.name);
+    this.contextValue = this.kind;
+    this.description = instanceId;
+    this.command = {
+      command: 'vscode.open',
+      title: 'Open',
+      arguments: [this.iconPath],
+    };
+    this.id = this.parent.id + '/' + instanceId;
+
+    const gmlFile = asset.gmlFilesArray?.[0];
+    const file = vscode.Uri.file(
+      gmlFile?.path.absolute || asset.yyPath.absolute,
+    );
+    this.command = {
+      command: 'vscode.open',
+      title: 'Open',
+      arguments: [file],
+    };
+    this.iconPath = getAssetIcon(asset.assetKind, asset);
+  }
+
+  get project() {
+    return this.parent.project;
   }
 }

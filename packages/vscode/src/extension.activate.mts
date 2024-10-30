@@ -234,6 +234,17 @@ export async function activateStitchExtension(
       project.run();
     }),
     registerCommand(
+      'stitch.stop',
+      (uriOrFolder: string[] | GameMakerFolder) => {
+        const project = findProject(workspace, uriOrFolder);
+        if (!project) {
+          void showErrorMessage('No project found to run!');
+          return;
+        }
+        project.kill();
+      },
+    ),
+    registerCommand(
       'stitch.run.noDefaults',
       async (uriOrFolder: string[] | GameMakerFolder) => {
         const project = findProject(workspace, uriOrFolder);
@@ -289,6 +300,9 @@ export async function activateStitchExtension(
         await project.openInIde();
       },
     ),
+    registerCommand('stitch.newProject', async () => {
+      await workspace.createNewProject();
+    }),
     workspace.semanticHighlightProvider.register(),
     workspace.signatureHelpStatus,
     vscode.window.onDidChangeTextEditorSelection((e) => {

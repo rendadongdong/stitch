@@ -1,5 +1,93 @@
 # @bscotch/gcdata Changelog
 
+## 0.24.1 (2024-10-02)
+
+### Fixes
+
+- Resolved issue causing errors when editing Buddy Comforts
+
+## 0.24.0 (2024-09-25)
+
+### Features
+
+- GameChanger data can now optionally have all refs and overrides resolved on load, for cases where that's useful.
+
+## 0.23.0 (2024-09-19)
+
+### Features
+
+- Can now create new Chats from the Quest Editor. Also less likely to delete changes not representable by the Editor.
+- Can now edit CL2 Chat motes
+- Can now parse stringified Chats
+
+### Fixes
+
+- Resolved issue causing errors upon multiple edits
+
+## 0.22.1 (2024-09-18)
+
+### Fixes
+
+- Resolved issue with Idle Topics not generating new IDs
+
+## 0.22.0 (2024-09-17)
+
+### Features
+
+- Stringified character data can now be used to update GameChanger data
+- Can now parse stringified character motes
+- Can now stringify character motes
+
+## 0.21.2 (2024-09-16)
+
+### Fixes
+
+- Resolved issue where folders inside Motes would not nest properly
+
+## 0.21.1 (2024-07-15)
+
+### Fixes
+
+- Resolved issue where an empty Quest log could stringify as 'undefined'
+
+## 0.21.0 (2024-07-10)
+
+### Features
+
+- The CL2 editor now shows all motes and allows editing Comforts
+- Added support for Buddy Comforts
+
+## 0.20.1 (2024-07-09)
+
+### Fixes
+
+- Resolved issue with absent "Stage" fields preventing saving
+
+## 0.20.0 (2024-07-09)
+
+### Features
+
+- Added support for Notes and Stage information
+- Updated CL2 types inferred from GameChanger
+
+### Fixes
+
+- Updated deps
+
+## 0.19.0 (2024-04-17)
+
+### Features
+
+- Removed comments and WIP content from the Quest/Storyline parser/stringifier
+- Updated CL2 types
+
+## 0.18.0 (2024-03-09)
+
+### Features
+
+- Added glossary terms to autocompletes within free-form parts of storylines
+- Added glossary terms to autocompletes within free-form text parts of quests
+
 ## 0.17.3 (2024-03-07)
 
 ### Fixes

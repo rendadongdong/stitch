@@ -1,6 +1,6 @@
 {
   "name": "@bscotch/stitch-site",
-  "version": "0.4.1",
+  "version": "0.9.1",
   "private": true,
   "type": "module",
   "scripts": {
@@ -21,6 +21,7 @@
   "devDependencies": {
     "@bscotch/gamemaker-releases": "workspace:*",
     "@bscotch/pathy": "^2.12.0",
+    "@bscotch/steam-bbcode": "workspace:*",
     "@sveltejs/adapter-static": "2.0.3",
     "@sveltejs/kit": "^1.27.6",
     "@typescript-eslint/eslint-plugin": "^6.11.0",

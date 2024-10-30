@@ -9,6 +9,7 @@ import {
 } from './types.cl2.rumpus.js';
 import {
   Bschema,
+  BschemaObject,
   ChangeType,
   Changes,
   changeSchema,
@@ -17,7 +18,9 @@ import {
   isBschemaConst,
   isBschemaEnum,
   isBschemaNumeric,
+  isBschemaRef,
   isBschemaString,
+  isObject,
   type Mote,
   type MoteId,
   type PackedData,
@@ -51,7 +54,15 @@ export interface MoteVisitorCtx<T = undefined> {
 }
 
 export class Gcdata {
-  constructor(public data: PackedData) {}
+  constructor(
+    public data: PackedData,
+    options?: { resolveRefsAndOverrides?: boolean },
+  ) {
+    // Resolve all refs and overrides in the schemas
+    if (options?.resolveRefsAndOverrides) {
+      Gcdata.resolveRefsAndOverrides(data);
+    }
+  }
   get motes(): PackedData['motes'] {
     return {
       ...this.data.motes,
@@ -201,9 +212,60 @@ export class Gcdata {
     ) as Mote<D>[];
   }
 
-  static async from(gcdataFile: Pathy) {
+  static async from(
+    gcdataFile: Pathy,
+    options?: { resolveRefsAndOverrides?: boolean },
+  ) {
     const data = JSON.parse(await gcdataFile.read({ parse: false }));
-    return new Gcdata(data);
+    return new Gcdata(data, options);
+  }
+
+  /**
+   * Given a raw packed data object, recurse through to resolve
+   * all references and overrides.
+   */
+  protected static resolveRefsAndOverrides(data: PackedData): void {
+    const recursivelyResolve = (subschema: Bschema) => {
+      while (isBschemaRef(subschema)) {
+        const ref = data.schemas[subschema.$ref];
+        assert(ref, `Could not resolve reference ${subschema.$ref}`);
+        // Mutate in place
+        Object.assign(subschema, ref);
+        //@ts-expect-error We've changed the type from a ref
+        delete subschema.$ref;
+      }
+      if (isObject(subschema)) {
+        if ('overrides' in subschema && isObject(subschema.overrides)) {
+          Object.assign(subschema, subschema.overrides);
+          delete subschema.overrides;
+        }
+        // If this was an object, need to recurse through properties
+        // and additionalProperties
+        if (
+          'additionalProperties' in subschema &&
+          isObject(subschema.additionalProperties)
+        ) {
+          recursivelyResolve(subschema.additionalProperties as BschemaObject);
+        }
+        if ('properties' in subschema && isObject(subschema.properties)) {
+          for (const prop of Object.values(
+            subschema.properties as Record<string, Bschema>,
+          )) {
+            recursivelyResolve(prop);
+          }
+        }
+        // // This gives us a max callstack error,
+        // // so there must be circularity somewhere
+        // if ('oneOf' in subschema && Array.isArray(subschema.oneOf)) {
+        //   for (const oneOf of subschema.oneOf) {
+        //     recursivelyResolve(oneOf);
+        //   }
+        // }
+      }
+    };
+    for (const schema of Object.values(data.schemas)) {
+      recursivelyResolve(schema);
+    }
   }
 }
 
@@ -227,15 +289,42 @@ export class GameChanger {
     return GameChanger.projectSaveDir(this.projectName);
   }
 
-  clearMoteChanges(moteId: string) {
-    delete this.changes.changes.motes?.[moteId];
-    // Re-clone the base data to reset the working data
+  /**
+   * Clear diffs for a subset of pointer patterns. This is so that
+   * diff types that are fully represented by other editors can be
+   * cleared, while leaving other changes intact.
+   */
+  clearMoteChanges(moteId: string, patterns: string[]) {
+    const priorDiffs = this.changes.changes.motes?.[moteId]?.diffs;
+    if (!priorDiffs) return;
+    const diffPointers: string[] = Object.keys(priorDiffs);
+    if (!diffPointers.length) return;
+
+    for (const pattern of patterns) {
+      const patternParts = pattern.split('/');
+      diff: for (const diffPointer of diffPointers) {
+        // Compare each part of the pointer and pattern. If all match, delete the diff.
+        const diffPointerParts = diffPointer.split('/');
+        if (diffPointerParts.length < patternParts.length) continue;
+        for (let i = 0; i < patternParts.length; i++) {
+          if (patternParts[i] === '*') continue; // Always allowed
+          if (patternParts[i] !== diffPointerParts[i]) {
+            // Then this diff does not match the pattern!
+            continue diff;
+          }
+        }
+        // If we made it here then we had a match. Delete it!
+        delete priorDiffs[diffPointer];
+      }
+    }
+    // Remove the working version, then recreate it from the diffs
     delete this.working.data.motes[moteId];
     if (this.base.data.motes[moteId]) {
       this.working.data.motes[moteId] = structuredClone(
         this.base.data.motes[moteId],
       );
     }
+    this.applyChanges();
   }
 
   updateMoteLocation(
@@ -291,6 +380,45 @@ export class GameChanger {
     }
   }
 
+  createMote(schemaId: string, moteId: string) {
+    assert(schemaId, 'Must specify schema ID');
+    assert(moteId, 'Must specify mote ID');
+    assert(
+      !this.working.getMote(moteId),
+      `Mote ${moteId} already exists in the working copy`,
+    );
+    const schema = this.working.getSchema(schemaId);
+    assert(schema, `Schema ${schemaId} does not exist`);
+
+    this.changes.changes.motes ||= {};
+
+    // If we already have this mote in changes, we cannot proceed
+    assert(
+      !this.changes.changes.motes[moteId],
+      `Mote ${moteId} already exists in changes`,
+    );
+
+    // Create the full change entry for the added mote
+    const item = changeSchema.parse({
+      mote_id: moteId,
+      mote_name: moteId,
+      schema_id: schemaId,
+      schema_title: schema.title,
+      type: 'added',
+      diffs: {
+        id: [null, moteId],
+        schema_id: [null, schemaId],
+      },
+    });
+    this.changes.changes.motes[moteId] = item;
+
+    this.applyChanges();
+    const mote = this.working.getMote(moteId);
+    assert(mote, `Mote ${moteId} not found after creation`);
+    gameChangerEvents.emit('gamechanger-working-updated', mote);
+    return mote;
+  }
+
   updateMoteData(moteId: string, dataPath: string, value: any) {
     assert(moteId, 'Must specify mote ID');
     assert(
@@ -337,7 +465,7 @@ export class GameChanger {
       );
     } else if (isBschemaEnum(subschema)) {
       assert(
-        subschema.enum.includes(value),
+        value === null || subschema.enum.includes(value),
         `'${value}' is not in enum ${JSON.stringify(subschema.enum)}`,
       );
     } else if (typeof value === 'string') {
@@ -420,11 +548,13 @@ export class GameChanger {
       `Schema ${schemaId} does not exist`,
     );
 
+    const schema = this.working.getSchema(schemaId);
     this.changes.changes[category] ||= {};
     const item = changeSchema.parse(
       this.changes.changes[category]?.[id] || {
         mote_id: moteId,
         schema_id: schemaId,
+        schema_title: schema?.title,
         type: change.type,
       },
     );

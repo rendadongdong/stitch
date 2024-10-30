@@ -15,7 +15,9 @@ import {
   Yyp,
   yyParentSchema,
   yypFolderSchema,
+  yyRoomSchema,
   YySchema,
+  YySound,
   yySpriteSchema,
   type YypConfig,
   type YypFolder,
@@ -219,11 +221,17 @@ export class Project {
     if (!asset) return;
     this.assets.delete(name);
     // Remove the asset from the yyp
-    const inYyp = this.yyp.resources.findIndex(
+    const resourceIdx = this.yyp.resources.findIndex(
       (r) => r.id.name.toLocaleLowerCase() === name,
     );
-    if (inYyp) {
-      this.yyp.resources.splice(inYyp, 1);
+    // If it's a room, remove it from the room order list
+    if (isAssetOfKind(asset, 'rooms')) {
+      this.yyp.RoomOrderNodes = this.yyp.RoomOrderNodes.filter((node) => {
+        node.roomId.path.toLowerCase() !== asset.resource.id.path.toLowerCase();
+      });
+    }
+    if (resourceIdx > -1) {
+      this.yyp.resources.splice(resourceIdx, 1);
       await this.saveYyp();
     }
 
@@ -346,6 +354,11 @@ export class Project {
     // Update the "name" field
     const yy = await Yy.read(newYyFile.absolute, asset.assetKind);
     yy.name = to;
+    if (isAssetOfKind(asset, 'sounds')) {
+      // Then we've renamed the sound file and need to update that in the yy!
+      const yySound = yy as YySound;
+      yySound.soundFile = yySound.soundFile.replace(oldNamePattern, to);
+    }
     await Yy.write(newYyFile.absolute, yy, asset.assetKind, this.yyp);
 
     // Register the new asset
@@ -363,10 +376,15 @@ export class Project {
     // Update the code from all refs to have the new name
     await this.renameSignifier(asset.signifier, to);
 
-    // Update immediate children to have the new asset as the parent
     if (isAssetOfKind(newAsset, 'objects')) {
+      // Update immediate children to have the new asset as the parent
       for (const child of asset.children) {
         child.parent = newAsset;
+      }
+      // Update any rooms that reference the old object name
+      for (const room of this.assets.values()) {
+        if (!isAssetOfKind(room, 'rooms')) continue;
+        await room.renameRoomInstanceObjects(from, to);
       }
     }
   }
@@ -494,7 +512,48 @@ export class Project {
   }
 
   @sequential
-  async createSprite(path: string, fromImageFile: string | Pathy) {
+  async createRoom(path: string): Promise<Asset<'rooms'> | undefined> {
+    const parsed = await this.parseNewAssetPath(path);
+    if (!parsed) {
+      return;
+    }
+    const { name, folder } = parsed;
+
+    const roomDir = this.dir.join(`rooms/${name}`);
+    await roomDir.ensureDirectory();
+    const roomYy = roomDir.join(`${name}.yy`);
+
+    const yy = yyRoomSchema.parse({
+      name,
+      parent: {
+        name: folder.name,
+        path: folder.folderPath,
+      },
+      layers: [{ resourceType: 'GMRBackgroundLayer' }],
+      views: [...Array(8)].map(() => ({})),
+    });
+    yy.views[0].visible = true;
+
+    await Yy.write(roomYy.absolute, yy, 'rooms', this.yyp);
+
+    // Update the yyp file
+    const info = await this.addAssetToYyp(roomYy.absolute, { skipSave: true });
+    this.yyp.RoomOrderNodes.push({ roomId: info.id });
+    await this.saveYyp();
+
+    // Create and add the asset
+    const asset = await Asset.from(this, info);
+    if (asset) {
+      this.registerAsset(asset);
+    }
+    return asset as Asset<'rooms'>;
+  }
+
+  @sequential
+  async createSprite(
+    path: string,
+    fromImageFile: string | Pathy,
+  ): Promise<Asset<'sprites'> | undefined> {
     // Create the yy file
     const parsed = await this.parseNewAssetPath(path);
     if (!parsed) {
@@ -545,7 +604,7 @@ export class Project {
     if (asset) {
       this.registerAsset(asset);
     }
-    return asset;
+    return asset as Asset<'sprites'>;
   }
 
   /**
@@ -553,7 +612,7 @@ export class Project {
    * in which case folders will be ensured up to the final component.
    */
   @sequential
-  async createObject(path: string) {
+  async createObject(path: string): Promise<Asset<'objects'> | undefined> {
     // Create the yy file
     const parsed = await this.parseNewAssetPath(path);
     if (!parsed) {
@@ -589,11 +648,11 @@ export class Project {
     if (asset) {
       this.registerAsset(asset);
     }
-    return asset;
+    return asset as Asset<'objects'>;
   }
 
   @sequential
-  async createShader(path: string) {
+  async createShader(path: string): Promise<Asset<'shaders'> | undefined> {
     // Create the yy file
     const parsed = await this.parseNewAssetPath(path);
     if (!parsed) {
@@ -630,7 +689,7 @@ export class Project {
     if (asset) {
       this.registerAsset(asset);
     }
-    return asset;
+    return asset as Asset<'shaders'>;
   }
 
   /**
@@ -638,7 +697,7 @@ export class Project {
    * in which case folders will be ensured up to the final component.
    */
   @sequential
-  async createScript(path: string) {
+  async createScript(path: string): Promise<Asset<'scripts'> | undefined> {
     // Create the yy file
     const parsed = await this.parseNewAssetPath(path);
     if (!parsed) {
@@ -674,7 +733,7 @@ export class Project {
     if (asset) {
       this.registerAsset(asset);
     }
-    return asset;
+    return asset as Asset<'scripts'>;
   }
 
   protected async parseNewAssetPath(path: string) {
@@ -722,6 +781,7 @@ export class Project {
     };
     // Insert the resource into a random spot in the list to avoid git conflicts,
     // avoiding the last spot because that's where changes are most likely to be.
+    // (This only matters for older project versions -- the newer version )
     const lastAllowed = Math.max(0, this.yyp.resources.length - 1);
     const insertAt = Math.floor(Math.random() * lastAllowed);
     this.yyp.resources.splice(insertAt, 0, resourceEntry);

@@ -18,7 +18,7 @@ import { stitchEvents } from './events.mjs';
 import { GameMakerProject } from './extension.project.mjs';
 import type { StitchWorkspace } from './extension.workspace.mjs';
 import { getAssetIcon, getBaseIcon } from './icons.mjs';
-import type { ObjectParentFolder } from './inspector.mjs';
+import type { ObjectParentFolder, ObjectSpriteFolder } from './inspector.mjs';
 import {
   getAssetFromRef,
   pathyFromUri,
@@ -38,6 +38,7 @@ import {
   TreeCode,
   TreeFilter,
   TreeFilterGroup,
+  TreeRoomInstance,
   TreeShaderFile,
   TreeSpriteFrame,
   type Treeable,
@@ -268,7 +269,34 @@ export class GameMakerTreeProvider
     this.view.reveal(treeItem, { focus: true });
   }
 
-  async setSprite(objectItem: ObjectParentFolder | TreeAsset) {
+  async deleteRoomInstance(item: TreeRoomInstance) {
+    const room = item.parent.asset;
+    await room.removeRoomInstance(item.instanceId);
+    this.changed(item.parent);
+  }
+
+  async addRoomInstance(roomItem: TreeAsset<'rooms'>) {
+    const asset = roomItem.asset;
+
+    const objectOptions = [...asset.project.assets.values()]
+      .filter((a) => isAssetOfKind(a, 'objects'))
+      .map((p) => ({
+        label: p.name,
+        object: p as Asset<'objects'>,
+      }));
+    const objectChoice = await vscode.window.showQuickPick(objectOptions, {
+      title: 'Choose the object to add to the room',
+    });
+    if (!objectChoice) {
+      return;
+    }
+    await asset.addRoomInstance(objectChoice.object);
+    this.changed(roomItem);
+  }
+
+  async setSprite(
+    objectItem: ObjectParentFolder | ObjectSpriteFolder | TreeAsset,
+  ) {
     const asset = objectItem.asset;
     if (!isAssetOfKind(asset, 'objects')) {
       return;
@@ -308,6 +336,8 @@ export class GameMakerTreeProvider
       typeof objectItem.onSetSprite === 'function'
     ) {
       objectItem.onSetSprite(spriteChoice.sprite);
+    } else if ('provider' in objectItem) {
+      objectItem.provider.onUpdate?.(objectItem);
     }
   }
 
@@ -390,6 +420,16 @@ export class GameMakerTreeProvider
     ) {
       objectItem.onSetParent(parentChoice.asset);
     }
+  }
+
+  async createRoom(where: GameMakerFolder) {
+    const info = await this.prepareForNewAsset(where);
+    if (!info) {
+      return;
+    }
+    const { folder, path } = info;
+    const asset = await where.project!.createRoom(path);
+    this.afterNewAssetCreated(asset, folder, where);
   }
 
   async createEvent(objectItem: TreeAsset) {
@@ -828,18 +868,28 @@ export class GameMakerTreeProvider
     } else if (element instanceof TreeFilterGroup) {
       return element.filters.sort((a, b) => a.query.localeCompare(b.query));
     } else if (element instanceof TreeAsset) {
-      if (element.asset.assetKind === 'objects') {
+      if (isAssetOfKind(element.asset, 'objects')) {
         return element.asset.gmlFilesArray.map((f) => new TreeCode(element, f));
-      } else if (element.asset.assetKind === 'sprites') {
+      } else if (isAssetOfKind(element.asset, 'sprites')) {
         return element.asset.framePaths.map(
           (p, i) => new TreeSpriteFrame(element, p, i),
         );
-      } else if (element.asset.assetKind === 'shaders') {
+      } else if (isAssetOfKind(element.asset, 'shaders')) {
         const paths = element.asset.shaderPaths!;
         return [
           new TreeShaderFile(element, paths.fragment),
           new TreeShaderFile(element, paths.vertex),
         ];
+      } else if (isAssetOfKind(element.asset, 'rooms')) {
+        const instances = element.asset.roomInstances;
+        return instances.map(
+          (i) =>
+            new TreeRoomInstance(
+              element as TreeAsset<'rooms'>,
+              i.object,
+              i.instanceId,
+            ),
+        );
       }
     }
     return;
@@ -1052,9 +1102,18 @@ export class GameMakerTreeProvider
         this.replaceSpriteFrames.bind(this),
       ),
       registerCommand('stitch.assets.newShader', this.createShader.bind(this)),
+      registerCommand('stitch.assets.newRoom', this.createRoom.bind(this)),
       registerCommand('stitch.assets.newEvent', this.createEvent.bind(this)),
       registerCommand('stitch.assets.setParent', this.setParent.bind(this)),
       registerCommand('stitch.assets.setSprite', this.setSprite.bind(this)),
+      registerCommand(
+        'stitch.assets.addRoomInstance',
+        this.addRoomInstance.bind(this),
+      ),
+      registerCommand(
+        'stitch.assets.deleteRoomInstance',
+        this.deleteRoomInstance.bind(this),
+      ),
       registerCommand('stitch.assets.reveal', this.reveal.bind(this)),
       registerCommand(
         'stitch.assets.filters.delete',

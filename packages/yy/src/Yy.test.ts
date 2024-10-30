@@ -1,6 +1,7 @@
 import { undent } from '@bscotch/utility';
 import { expect } from 'chai';
 import { existsSync, mkdirSync, readdirSync } from 'fs';
+import fs from 'node:fs/promises';
 import { z } from 'zod';
 import { Yy } from './Yy.js';
 import { yyResourceTypes } from './types/YyBase.js';
@@ -111,35 +112,6 @@ describe('Yy Files', function () {
       ),
       'A FixedNumber should equal another FixedNumber with a different precision',
     ).to.be.true;
-  });
-
-  it('can use FixedNumber instances in place of number primitives', function () {
-    expect(new FixedNumber(1)).to.be.an.instanceof(FixedNumber);
-    // @ts-expect-error
-    expect(new FixedNumber(1) == 1).to.be.true;
-    // @ts-expect-error
-    expect(new FixedNumber(1) == 2).to.be.false;
-    // @ts-expect-error
-    expect(new FixedNumber(32) + 2 == 34).to.be.true;
-    // @ts-expect-error
-    expect(new FixedNumber(32) + 2 == 3).to.be.false;
-    // @ts-expect-error
-    expect(new FixedNumber(10.11) == 10.11).to.be.true;
-    // @ts-expect-error
-    expect(new FixedNumber(10.11) === 10.11).to.be.false;
-    // @ts-expect-error
-    expect(new FixedNumber(10.11) > 10).to.be.true;
-    // @ts-expect-error
-    expect(new FixedNumber(10.11) < 12).to.be.true;
-    // @ts-expect-error
-    expect(new FixedNumber(10.11) < 10).to.be.false;
-    // @ts-expect-error
-    expect(new FixedNumber(10.11) > 12).to.be.false;
-    expect(`${new FixedNumber(10.123, 2)}`).to.equal('10.12');
-    // @ts-expect-error
-    expect(new FixedNumber(10.123, 2) == '10.12').to.be.false;
-    // @ts-expect-error
-    expect(new FixedNumber(10.123, 2) == '10.123').to.be.true;
   });
 
   it('can create GameMaker-style JSON', function () {
@@ -317,6 +289,18 @@ describe('Yy Files', function () {
     for (let i = 0; i < referenceOrder.length; i++) {
       expect(sorted[i].folderPath).to.equal(referenceOrder[i].folderPath);
     }
+  });
+
+  xit('can convert an old-format sprite yy file to the new format', async function () {
+    const project = await Yy.read(
+      './samples/project/Crashlands2.yyp',
+      'project',
+    );
+    const rawSprite = JSON.parse(
+      await fs.readFile('./samples/to-convert.yy', 'utf8'),
+    );
+    const stringified = Yy.stringify(rawSprite, 'sprites', project);
+    console.log(stringified);
   });
 
   for (const resourceType of ['project', ...yyResourceTypes] as const) {

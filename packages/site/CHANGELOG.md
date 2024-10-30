@@ -1,5 +1,46 @@
 # @bscotch/stitch-site Changelog
 
+## 0.9.1 (2024-10-02)
+
+### Fixes
+
+- Added head content to all site pages
+- Improved styling on the new BBCode generator page
+
+## 0.9.0 (2024-10-01)
+
+### Features
+
+- Added a page for converting Markdown to Steam BBCode
+
+## 0.8.1 (2024-08-29)
+
+### Fixes
+
+- Resolved issues with the date pickers for Steam URL date ranges
+
+## 0.8.0 (2024-08-03)
+
+### Features
+
+- Added language-specific store page links
+
+## 0.6.0 (2024-04-22)
+
+### Features
+
+- Added SBV to TSV converter
+
+### Fixes
+
+- Resolved issue with missing Stitch logo
+
+## 0.5.0 (2024-04-19)
+
+### Features
+
+- Added a utility page for getting YouTube SBV files from spreadsheets
+
 ## 0.4.0 (2023-10-05)
 
 ### Features

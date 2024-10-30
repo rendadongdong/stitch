@@ -1,22 +1,21 @@
 export type StorylineMoteDataPointer = `data/${StorylineMotePointer}`;
 export type StorylineMotePointer = ``
   | `description/description`
+  | `description/skip`
   | `description/text`
   | `description`
   | `icon`
   | `name/description`
+  | `name/skip`
   | `name/text`
   | `name`
   | `order`
-  | `wip/audio`
-  | `wip/balance`
-  | `wip/comments/${string}/element`
-  | `wip/comments/${string}/order`
-  | `wip/comments/${string}`
-  | `wip/comments`
-  | `wip/draft`
-  | `wip/integration`
-  | `wip/mechanics`
-  | `wip/text`
-  | `wip/visuals`
+  | `wip/notes/${string}/element/author`
+  | `wip/notes/${string}/element/text`
+  | `wip/notes/${string}/element/timestamp`
+  | `wip/notes/${string}/element`
+  | `wip/notes/${string}/order`
+  | `wip/notes/${string}`
+  | `wip/notes`
+  | `wip/staging`
   | `wip`;

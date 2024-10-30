@@ -1,8 +1,7 @@
 import type { Glossary } from '@bscotch/cl2-string-server-shared';
 import type { Gcdata } from './GameChanger.js';
 import { assert } from './assert.js';
-import { ParsedLineItem } from './cl2.quest.types.js';
-import { ParsedWord } from './cl2.types.editor.js';
+import type { ParsedLineItem, ParsedWord } from './types.editor.js';
 import {
   BschemaObject,
   getAdditionalProperties,
@@ -155,6 +154,7 @@ export function normalizeSchema(
   /** For resolving oneOfs */
   data: any,
 ): Bschema {
+  let overrides: Bschema | undefined;
   if ('$ref' in schema) {
     const refParts = schema.$ref.split('/');
     schema = gcData.getSchema(refParts[0])!;
@@ -162,6 +162,9 @@ export function normalizeSchema(
     if (refParts.length > 1) {
       schema = resolvePointer(refParts.slice(1), schema)!;
       assert(schema, `Could not resolve subpointer $ref ${refParts.join('/')}`);
+    }
+    if ('overrides' in schema) {
+      overrides = schema.overrides;
     }
   }
   const oneOf = 'oneOf' in schema ? resolveOneOf(schema, data) : undefined;
@@ -185,6 +188,7 @@ export function normalizeSchema(
     // @ts-ignore
     additionalProperties,
     oneOf: undefined,
+    ...overrides,
   };
 }
 
@@ -381,4 +385,12 @@ export function checkWords(
     result.push(asGcWord);
   }
   return result;
+}
+
+export function includes<T>(arr: T[], value: any): value is T {
+  return arr.includes(value);
+}
+
+export function cleanGameChangerString(str: string | undefined): string {
+  return (str || '').replace(/\r?\n/g, ' / ').trim();
 }

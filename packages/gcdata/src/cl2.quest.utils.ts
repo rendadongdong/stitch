@@ -15,30 +15,28 @@ export function getMoteLists(packed: Gcdata) {
     allowedSpeakers.length > 0,
     'Should have at least one allowed speaker mote',
   );
+
   const allowedGivers = getAllowedGivers(packed);
   assert(
     allowedGivers.length > 0,
     'Should have at least one allowed giver mote',
   );
+
   const storylines =
     packed.listMotesBySchema<Crashlands2.Schemas['cl2_storyline']>(
       'cl2_storyline',
     );
   assert(storylines.length > 0, 'Should have at least one storyline mote');
+
   const quests =
     packed.listMotesBySchema<Crashlands2.Schemas['cl2_quest']>('cl2_quest');
   assert(quests.length > 0, 'Should have at least one quest mote');
-
-  const emojis =
-    packed.listMotesBySchema<Crashlands2.Schemas['cl2_emoji']>('cl2_emoji');
-  assert(emojis.length > 0, 'Should have at least one emoji mote');
 
   return {
     allowedSpeakers,
     allowedGivers,
     storylines,
     quests,
-    emojis,
   };
 }
 
@@ -67,7 +65,7 @@ function getAllowedSpeakers(packed: Gcdata) {
   );
 }
 
-export function getReuirementQuestStatuses(packed: Gcdata): string[] {
+export function getRequirementQuestStatuses(packed: Gcdata): string[] {
   const subschema = resolvePointerInSchema(
     ['quest_start_requirements', 'anykey', 'element', 'quest_status'],
     {

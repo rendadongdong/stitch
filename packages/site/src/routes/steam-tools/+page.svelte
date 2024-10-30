@@ -1,4 +1,6 @@
 <script lang="ts">
+	import { base } from '$app/paths';
+
 	// Keep a query parameter "steamid" in sync with the steamId variable
 	import Bookmarklets from './components/Bookmarklets.svelte';
 	import Comparisons from './components/Comparisons.svelte';
@@ -9,10 +11,10 @@
 </script>
 
 <svelte:head>
-	<title>Steam Stats Portal</title>
+	<title>Steam Tools Portal | Stitch | Butterscotch Shenanigans</title>
 	<meta
 		name="description"
-		content="Get useful tools and links to stats pages for your Steam game."
+		content="Plug in your game's Steam App ID to get easy links to stats, UTM link generation, bookmarklets, and more."
 	/>
 </svelte:head>
 
@@ -32,6 +34,12 @@
 	<Comparisons />
 
 	<h2>Tools</h2>
+
+	<section>
+		<h3>
+			<a data-sveltekit-reload href={`${base}/steam-tools/bbcode`}>Steam BBCode Generator</a>
+		</h3>
+	</section>
 
 	<SteamUtmGenerator />
 

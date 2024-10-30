@@ -1,5 +1,54 @@
 # @bscotch/gml-parser Changelog
 
+## 1.11.0 (2024-08-15)
+
+### Features
+
+- Added slot names to the Spine Sprite viewer
+
+## 1.10.0 (2024-07-29)
+
+### Features
+
+- The parser can now handle the case where a type is improperly wrapped in brackets.
+
+## 1.9.4 (2024-07-17)
+
+### Fixes
+
+- JSDoc descriptions no longer remove inferred types
+
+## 1.9.3 (2024-06-21)
+
+### Fixes
+
+- Resolved issue where renaming a sound asset would not properly update the sound file reference, causing compiles to fail.
+
+## 1.9.2 (2024-04-29)
+
+### Fixes
+
+- Renaming an object now properly renames its room instances.
+
+## 1.9.0 (2024-03-08)
+
+### Features
+
+- Renamed room-asset-management methods for clarity.
+- Can now list a room's object instances
+
+### Fixes
+
+- When deleting a room asset, it is now also removed from the room order list
+
+## 1.8.0 (2024-03-08)
+
+### Features
+
+- Can now add an object to a room
+- New rooms now also include a default background layer and 8 views
+- Can now add rooms to a project
+
 ## 1.7.5 (2024-03-06)
 
 ### Fixes

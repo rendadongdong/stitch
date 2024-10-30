@@ -1,7 +1,7 @@
 {
   "name": "crashlands-editor",
   "displayName": "Crashlands 2 Editor",
-  "version": "0.19.1",
+  "version": "0.26.2",
   "private": true,
   "description": "Tools for Crashlands 2 development.",
   "categories": [
@@ -35,15 +35,20 @@
     "commands": [
       {
         "command": "crashlands.quests.enter",
-        "enablement": "editorLangId == 'cl2-quest'",
+        "enablement": "editorLangId == 'cl2-quest' || editorLangId == 'cl2-character' || editorLangId == 'cl2-chat'",
         "category": "Crashlands",
         "title": "On Enter"
       },
       {
         "command": "crashlands.editor.backup.restore",
-        "enablement": "editorLangId == 'cl2-quest' || editorLangId == 'cl2-storyline'",
+        "enablement": "editorLangId == 'cl2-quest' || editorLangId == 'cl2-storyline' || editorLangId == 'cl2-character' || editorLangId == 'cl2-chat'",
         "category": "Crashlands",
         "title": "Restore Backup"
+      },
+      {
+        "command": "bscotch.strings.addGlossaryEntry",
+        "category": "Crashlands",
+        "title": "Add Glossary Entry"
       },
       {
         "command": "crashlands.open.saveDir",
@@ -59,6 +64,11 @@
         "command": "crashlands.tree.copyFolderPath",
         "category": "Crashlands",
         "title": "Copy Path"
+      },
+      {
+        "command": "crashlands.tree.newChat",
+        "category": "Crashlands",
+        "title": "New Chat"
       },
       {
         "command": "crashlands.tree.dropMode.order.enable",
@@ -108,24 +118,39 @@
       {
         "language": "cl2-quest",
         "scopeName": "source.cl2-quest",
-        "path": "./syntaxes/cl2-quest.tmLanguage.json"
+        "path": "./syntaxes/cl2-editor.tmLanguage.json"
       },
       {
         "language": "cl2-storyline",
         "scopeName": "source.cl2-quest",
-        "path": "./syntaxes/cl2-storyline.tmLanguage.json"
+        "path": "./syntaxes/cl2-editor.tmLanguage.json"
+      },
+      {
+        "language": "cl2-comfort",
+        "scopeName": "source.cl2-quest",
+        "path": "./syntaxes/cl2-editor.tmLanguage.json"
+      },
+      {
+        "language": "cl2-character",
+        "scopeName": "source.cl2-quest",
+        "path": "./syntaxes/cl2-editor.tmLanguage.json"
+      },
+      {
+        "language": "cl2-chat",
+        "scopeName": "source.cl2-quest",
+        "path": "./syntaxes/cl2-editor.tmLanguage.json"
       }
     ],
     "keybindings": [
       {
         "command": "crashlands.quests.enter",
         "key": "enter",
-        "when": "editorLangId == 'cl2-quest' && editorTextFocus && !suggestWidgetVisible"
+        "when": "editorTextFocus && !suggestWidgetVisible"
       },
       {
         "command": "crashlands.quests.enter",
         "key": "shift+enter",
-        "when": "editorLangId == 'cl2-quest' && editorTextFocus && !suggestWidgetVisible",
+        "when": "editorTextFocus && !suggestWidgetVisible",
         "args": {
           "shift": true
         }
@@ -137,7 +162,7 @@
         "aliases": [
           "Cl2 Quest"
         ],
-        "configuration": "./languages/cl2-quest.language-configuration.json",
+        "configuration": "./languages/cl2-editor.language-configuration.json",
         "extensions": [
           ".cl2_quest"
         ]
@@ -147,9 +172,40 @@
         "aliases": [
           "Cl2 Storyline"
         ],
-        "configuration": "./languages/cl2-storyline.language-configuration.json",
+        "configuration": "./languages/cl2-editor.language-configuration.json",
         "extensions": [
           ".cl2_storyline"
+        ]
+      },
+      {
+        "id": "cl2-comfort",
+        "aliases": [
+          "Cl2 Comfort"
+        ],
+        "configuration": "./languages/cl2-editor.language-configuration.json",
+        "extensions": [
+          ".cl2_artisan_glads"
+        ]
+      },
+      {
+        "id": "cl2-character",
+        "aliases": [
+          "CL2 Character"
+        ],
+        "configuration": "./languages/cl2-editor.language-configuration.json",
+        "extensions": [
+          ".artisan",
+          ".cl2_npc"
+        ]
+      },
+      {
+        "id": "cl2-chat",
+        "aliases": [
+          "Cl2 Chat"
+        ],
+        "configuration": "./languages/cl2-editor.language-configuration.json",
+        "extensions": [
+          ".cl2_chat"
         ]
       }
     ],
@@ -157,7 +213,16 @@
       "commandPalette": [
         {
           "command": "crashlands.editor.backup.restore",
-          "when": "editorLangId == 'cl2-quest' || editorLangId == 'cl2-storyline'"
+          "when": "editorLangId == 'cl2-quest' || editorLangId == 'cl2-storyline' || editorLangId == 'cl2-character' || editorLangId == 'cl2-chat'"
+        },
+        {
+          "command": "bscotch.strings.addGlossaryEntry"
+        }
+      ],
+      "editor/context": [
+        {
+          "command": "bscotch.strings.addGlossaryEntry",
+          "group": "1_modification"
         }
       ],
       "view/title": [
@@ -174,9 +239,14 @@
       ],
       "view/item/context": [
         {
+          "command": "crashlands.tree.newChat",
+          "when": "view == cl2-stories",
+          "group": "navigation@1"
+        },
+        {
           "command": "crashlands.tree.setFolder",
           "when": "view == cl2-stories && viewItem =~ /^mote-/",
-          "group": "navigation@1"
+          "group": "navigation@2"
         },
         {
           "command": "crashlands.tree.copyFolderPath",
@@ -214,19 +284,19 @@
   "devDependencies": {
     "@bscotch/emitter": "0.2.1",
     "@bscotch/pathy": "^2.12.0",
-    "@bscotch/trebuchet": "2.9.3",
+    "@bscotch/trebuchet": "2.9.4",
     "@bscotch/utility": "^7.2.0",
-    "@types/vscode": "1.84.1",
-    "@vscode/vsce": "2.22.0",
-    "esbuild": "^0.19.5",
-    "glob": "10.3.10",
-    "nodemon": "^3.0.1",
-    "turbo": "^1.10.16",
-    "typescript": "5.2.2",
-    "zx": "^7.2.3"
+    "@types/vscode": "1.91.0",
+    "@vscode/vsce": "2.29.0",
+    "esbuild": "^0.23.0",
+    "glob": "11.0.0",
+    "nodemon": "^3.1.4",
+    "turbo": "^2.0.6",
+    "typescript": "5.5.3",
+    "zx": "^8.1.4"
   },
   "engines": {
-    "vscode": "^1.84.0"
+    "vscode": "^1.91.0"
   },
   "icon": "./images/cl2-editor-logo.png",
   "galleryBanner": {

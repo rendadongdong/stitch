@@ -5,6 +5,7 @@ import type {
   IgorWebviewExtensionPostLogs,
   IgorWebviewExtensionPostRun,
   IgorWebviewLog,
+  IgorWebviewPosts,
 } from '@local-vscode/shared';
 import { spawn, type ChildProcessWithoutNullStreams } from 'node:child_process';
 import vscode from 'vscode';
@@ -13,7 +14,7 @@ import { assertLoudly } from './assert.mjs';
 import { stitchConfig } from './config.mjs';
 import { StitchEvents, stitchEvents } from './events.mjs';
 import type { StitchWorkspace } from './extension.workspace.mjs';
-import { registerCommand } from './lib.mjs';
+import { registerCommand, uriFromCodeFile } from './lib.mjs';
 
 export class StitchIgorView implements vscode.WebviewViewProvider {
   readonly viewType = 'bscotch-stitch-igor';
@@ -25,12 +26,39 @@ export class StitchIgorView implements vscode.WebviewViewProvider {
 
   constructor(readonly workspace: StitchWorkspace) {}
 
+  async reveal() {
+    await vscode.commands.executeCommand(`${this.viewType}.focus`);
+  }
+
   resolveWebviewView(webviewView: vscode.WebviewView): void | Thenable<void> {
     if (this.container) return;
     this.container = webviewView;
     const webview = webviewView.webview;
     webview.options = { enableScripts: true, enableCommandUris: true };
     webview.html = this.getWebviewContent(webview);
+    webview.onDidReceiveMessage(async (e: IgorWebviewPosts) => {
+      if (e.kind === 'open') {
+        // Go to the asset in the editor
+        const asset = this.workspace
+          .getActiveProject()
+          ?.getAssetByName(e.asset);
+        assertLoudly(asset, `Asset not found: ${e.asset}`);
+        const file =
+          e.type === 'objects' && e.event
+            ? (asset.getEventByName(e.event as any) ?? asset.gmlFile)
+            : asset.gmlFile;
+        const editor = await vscode.window.showTextDocument(
+          uriFromCodeFile(file),
+        );
+        // Go to the line
+        if (e.line) {
+          const line = e.line - 1;
+          const range = editor.document.lineAt(line).range;
+          editor.selection = new vscode.Selection(range.start, range.start);
+          editor.revealRange(range);
+        }
+      }
+    });
   }
 
   protected getWebviewContent(webview: vscode.Webview) {
@@ -65,12 +93,28 @@ export class StitchIgorView implements vscode.WebviewViewProvider {
     });
   }
 
-  async run(event: StitchEvents.RequestRunInWebview['payload'][0]) {
-    assertLoudly(this.container, 'Runner container not initialized!');
-    if (this.runner && this.runner.exitCode === null) {
-      // Kill the current instance
+  kill() {
+    const pid = this.runner?.pid;
+    if (typeof pid !== 'number') return;
+    if (this.runner?.exitCode !== null) {
+      // Then it's already dead
+      return;
+    }
+    // Doesn't terminate on Windows...
+    if (process.platform === 'win32') {
+      spawn('taskkill', ['/pid', `${pid}`, '/f', '/t']);
+    } else {
       this.runner.kill();
     }
+  }
+
+  async run(event: StitchEvents.RequestRunInWebview['payload'][0]) {
+    await this.reveal(); // So that VSCode creates the container
+    assertLoudly(
+      this.container,
+      'Runner container not initialized! Please try again.',
+    );
+    this.kill();
     // Make sure our config is up to date for styling
     this.lastRequest = event;
     const runMessage: IgorWebviewExtensionPostRun = {
@@ -113,6 +157,10 @@ export class StitchIgorView implements vscode.WebviewViewProvider {
     const igorView = new StitchIgorView(workspace);
     stitchEvents.on('request-run-project-in-webview', (payload) => {
       igorView.run(payload);
+    });
+    stitchEvents.on('request-kill-project-in-webview', () => {
+      console.log('Killing runner', !!igorView.runner);
+      igorView.kill();
     });
     return [
       vscode.window.registerWebviewViewProvider(igorView.viewType, igorView),

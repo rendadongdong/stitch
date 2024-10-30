@@ -1,5 +1,31 @@
 # @bscotch/yy Changelog
 
+## 2.3.0 (2024-10-18)
+
+### Features
+
+- Added utility class for working with GameMaker version strings
+
+### Fixes
+
+- Updated YY-writing to add set file versions to 'v1' for some fields, to resolve issue with recent GameMaker format changes
+
+## 2.2.1 (2024-04-29)
+
+### Fixes
+
+- Resolved an issue where the "%Name" field was not always deleted from new sprite tracks
+
+## 2.2.0 (2024-03-08)
+
+### Features
+
+- Changed defaults to better match our typical use cases
+
+### Fixes
+
+- Improved defaults for new yy files for compatibility with latest GameMaker
+
 ## 2.1.8 (2024-03-06)
 
 ### Fixes

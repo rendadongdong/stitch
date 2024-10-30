@@ -1,37 +1,37 @@
-import { GameChanger } from './GameChanger.js';
+import type { GameChanger } from './GameChanger.js';
 import { assert } from './assert.js';
-import { QuestMoteDataPointer } from './cl2.quest.pointers.js';
+import type { QuestMoteDataPointer } from './cl2.quest.pointers.js';
 import {
+  linePatterns,
   ParsedClue,
   ParsedDialog,
   ParsedEmoteGroup,
-  ParsedLine,
-  ParsedLineItem,
   QuestMomentsLabel,
   QuestRequirementsLabel,
   QuestUpdateResult,
-  arrayTagPattern,
-  lineIsArrayItem,
-  linePatterns,
-  parseIfMatch,
 } from './cl2.quest.types.js';
 import {
   getMomentStyleNames,
   getMoteLists,
+  getRequirementQuestStatuses,
   getRequirementStyleNames,
-  getReuirementQuestStatuses,
   isEmoteMoment,
 } from './cl2.quest.utils.js';
+import {
+  isCommentLine,
+  isStageLine,
+  prepareParserHelpers,
+  updateWipChangesFromParsed,
+} from './cl2.shared.parse.js';
+import { questSchemaId } from './cl2.shared.types.js';
 import { Crashlands2 } from './cl2.types.auto.js';
 import {
   bsArrayToArray,
   changedPosition,
-  createBsArrayKey,
   updateBsArrayOrder,
 } from './helpers.js';
-import { Position } from './types.editor.js';
-import { Mote } from './types.js';
-import { checkWords } from './util.js';
+import type { Position } from './types.editor.js';
+import type { Mote } from './types.js';
 
 export function parseStringifiedQuest(
   text: string,
@@ -47,31 +47,12 @@ export function parseStringifiedQuest(
     momentStyles.splice(momentStyles.indexOf(style), 1);
   }
   const requirementStyles = getRequirementStyleNames(packed.working);
-  const requirementQuestStatuses = getReuirementQuestStatuses(packed.working);
+  const requirementQuestStatuses = getRequirementQuestStatuses(packed.working);
   const requirementCompletions = [...requirementStyles];
   requirementCompletions.splice(requirementCompletions.indexOf('Quest'), 1);
   requirementCompletions.push(
     ...requirementQuestStatuses.map((s) => `Quest ${s}`),
   );
-
-  /**
-   * Shared list of keywords that can be used at the start of any line,
-   * with required-unique entries removed when found.
-   */
-  const nonUniqueGlobalLabels = new Set<string>(['Clue']);
-  const availableGlobalLabels = new Set<string>([
-    'Draft',
-    'Name',
-    'Storyline',
-    'Giver',
-    'Receiver',
-    'Clue',
-    'Start Requirements',
-    'Start Moments',
-    'End Requirements',
-    'End Moments',
-    'Log',
-  ]);
 
   const result: QuestUpdateResult = {
     diagnostics: [],
@@ -89,27 +70,29 @@ export function parseStringifiedQuest(
     },
   };
 
-  const lines = text.split(/(\r?\n)/g);
-
-  let index = 0;
-  let lineNumber = 0;
-
-  const emojiIdFromName = (name: string | undefined): string | undefined => {
-    if (!name) {
-      return undefined;
-    }
-    const emoji = motes.emojis.find(
-      (e) =>
-        packed.working.getMoteName(e)?.toLowerCase() ===
-          name?.trim().toLowerCase() || e.id === name?.trim(),
-    );
-    return emoji?.id;
-  };
-
-  const checkSpelling = (item: ParsedLineItem<any> | undefined) => {
-    if (!item || !options.checkSpelling || !packed.glossary) return;
-    result.words.push(...checkWords(item, packed.glossary));
-  };
+  const helpers = prepareParserHelpers(
+    text,
+    packed,
+    {
+      ...options,
+      schemaId: questSchemaId,
+      globalNonUniqueLabels: new Set(['Clue']),
+      globalLabels: new Set([
+        'Stage',
+        'Name',
+        'Storyline',
+        'Giver',
+        'Receiver',
+        'Clue',
+        'Start Requirements',
+        'Start Moments',
+        'End Requirements',
+        'End Moments',
+        'Log',
+      ]),
+    },
+    result,
+  );
 
   /** The MoteId for the last speaker we saw. Used to figure out who to assign stuff to */
   let lastSpeaker: undefined | string;
@@ -117,114 +100,38 @@ export function parseStringifiedQuest(
   let lastSectionGroup: QuestMomentsLabel | QuestRequirementsLabel | undefined;
   let lastEmojiGroup: undefined | ParsedEmoteGroup;
 
-  for (const line of lines) {
+  for (const line of helpers.lines) {
     const trace: any[] = [];
 
     try {
-      // Is this just a newline?
-      if (line.match(/\r?\n/)) {
-        // Then we just need to increment the index
-        index += line.length;
-        lineNumber++;
-        continue;
-      }
-
-      const lineRange = {
-        start: {
-          index,
-          line: lineNumber,
-          character: 0,
-        },
-        end: {
-          index: index + line.length,
-          line: lineNumber,
-          character: line.length,
-        },
-      };
+      const lineRange = helpers.currentLineRange;
 
       // Is this just a blank line?
       if (!line) {
         // Add global autocompletes
-        result.completions.push({
-          type: 'labels',
+        const pos = {
           start: lineRange.start,
           end: lineRange.end,
-          options: availableGlobalLabels,
-        });
+        };
         if (isQuestMomentLabel(lastSectionGroup)) {
           result.completions.push({
             type: 'momentStyles',
             options: momentStyles,
-            start: lineRange.start,
-            end: lineRange.end,
+            ...pos,
           });
         } else if (isQuestRequirementLabel(lastSectionGroup)) {
           result.completions.push({
             type: 'requirementStyles',
             options: requirementCompletions,
-            start: lineRange.start,
-            end: lineRange.end,
+            ...pos,
           });
         }
         continue;
       }
 
       // Find the first matching pattern and pull the values from it.
-      let parsedLine: null | ParsedLine = null;
-      for (const pattern of linePatterns) {
-        parsedLine = parseIfMatch(pattern, line, lineRange.start);
-        if (parsedLine) break;
-      }
-      if (!parsedLine) {
-        // Then this is likely the result of uncommenting something
-        // that was commented out, resulting in a line that starts with
-        // the comment's array tag. Provide a deletion edit!
-        parsedLine = parseIfMatch(
-          `^${arrayTagPattern} +(?<text>.*)$`,
-          line,
-          lineRange.start,
-        );
-        if (parsedLine) {
-          result.edits.push({
-            start: lineRange.start,
-            end: lineRange.end,
-            newText: parsedLine.text!.value!,
-          });
-        } else {
-          result.diagnostics.push({
-            message: `Unfamiliar syntax: ${line}`,
-            ...lineRange,
-          });
-        }
-
-        index += line.length;
-        continue;
-      }
-
-      // Ensure the array tag. It goes right after the label or indicator.
-      if (!parsedLine.arrayTag?.value && lineIsArrayItem(line)) {
-        const arrayTag = createBsArrayKey();
-        const start = parsedLine.indicator?.end || parsedLine.label?.end!;
-        result.edits.push({
-          start,
-          end: start,
-          newText: `#${arrayTag}`,
-        });
-        parsedLine.arrayTag = {
-          start,
-          end: start,
-          value: arrayTag,
-        };
-      }
-
-      // If this has a label, remove it from the list of available labels
-      if (
-        parsedLine.label?.value &&
-        availableGlobalLabels.has(parsedLine.label.value) &&
-        !nonUniqueGlobalLabels.has(parsedLine.label.value)
-      ) {
-        availableGlobalLabels.delete(parsedLine.label.value);
-      }
+      const parsedLine = helpers.parseCurrentLine(linePatterns);
+      if (!parsedLine) continue;
 
       // Track common problems so that we don't need to repeat logic
       /** The character where a mote should exist. */
@@ -278,16 +185,16 @@ export function parseStringifiedQuest(
         result.parsed.clues.push(lastClue);
       } else if (indicator === '>') {
         // Then this is a dialog line, either within a Clue or a Dialog Moment
-        const emoji = emojiIdFromName(parsedLine.emojiName?.value);
+        const emoji = helpers.emojiIdFromName(parsedLine.emojiName?.value);
         if (parsedLine.emojiGroup) {
           // Emojis are optional. If we see a "group" (parentheses) then
           // that changes to a requirement.
           requiresEmoji = {
             at: changedPosition(parsedLine.emojiGroup.start, { characters: 1 }),
-            options: motes.emojis,
+            options: helpers.emojis,
           };
         }
-        checkSpelling(parsedLine.text);
+        helpers.checkSpelling(parsedLine.text);
         const moment: ParsedDialog = {
           kind: 'dialogue',
           id: parsedLine.arrayTag?.value?.trim(),
@@ -314,11 +221,11 @@ export function parseStringifiedQuest(
             ...lineRange,
           });
         }
-      } else if (labelLower === 'draft') {
-        result.parsed.draft = parsedLine.text?.value?.trim() === 'true';
+      } else if (isStageLine(parsedLine)) {
+        helpers.addStage(parsedLine);
       } else if (labelLower === 'log') {
         result.parsed.quest_start_log = parsedLine.text?.value?.trim();
-        checkSpelling(parsedLine.text);
+        helpers.checkSpelling(parsedLine.text);
       } else if (labelLower === 'storyline') {
         requiresMote = {
           at: parsedLine.labelGroup!.end,
@@ -375,7 +282,7 @@ export function parseStringifiedQuest(
               at: changedPosition(parsedLine.emojiGroup.start, {
                 characters: 1,
               }),
-              options: motes.emojis,
+              options: helpers.emojis,
             };
           } else {
             result.diagnostics.push({
@@ -386,7 +293,7 @@ export function parseStringifiedQuest(
           lastEmojiGroup.emotes.push({
             id: parsedLine.arrayTag?.value?.trim(),
             speaker: parsedLine.moteTag?.value?.trim(),
-            emoji: emojiIdFromName(parsedLine.emojiName?.value),
+            emoji: helpers.emojiIdFromName(parsedLine.emojiName?.value),
           });
         } else {
           result.diagnostics.push({
@@ -498,13 +405,8 @@ export function parseStringifiedQuest(
             ...lineRange,
           });
         }
-      } else if (indicator === '//') {
-        // Then this is a comment/note
-        result.parsed.comments.push({
-          id: parsedLine.arrayTag?.value?.trim(),
-          text: parsedLine.text?.value?.trim(),
-        });
-        checkSpelling(parsedLine.text);
+      } else if (isCommentLine(parsedLine)) {
+        helpers.addComment(parsedLine);
       }
 
       if (requiresEmoji) {
@@ -518,7 +420,7 @@ export function parseStringifiedQuest(
             options: requiresEmoji.options,
             ...where,
           });
-        } else if (!emojiIdFromName(parsedLine.emojiName?.value)) {
+        } else if (!helpers.emojiIdFromName(parsedLine.emojiName?.value)) {
           result.diagnostics.push({
             message: `Emoji "${parsedLine.emojiName?.value}" not found!`,
             ...where,
@@ -556,7 +458,7 @@ export function parseStringifiedQuest(
       throw err;
     }
 
-    index += line.length;
+    helpers.index += line.length;
   }
 
   return result;
@@ -573,7 +475,20 @@ export async function updateChangesFromParsedQuest(
   try {
     // We're always going to be computing ALL changes, so clear whatever
     // we previously had.
-    packed.clearMoteChanges(moteId);
+    packed.clearMoteChanges(moteId, [
+      'data/wip/staging',
+      'data/wip/notes/*',
+      'data/name',
+      'data/quest_giver',
+      'data/quest_receiver',
+      'data/quest_start_log',
+      'data/storyline',
+      'data/clues/*',
+      'data/quest_start_requirements',
+      'data/quest_end_requirements',
+      'data/quest_start_moments',
+      'data/quest_end_moments',
+    ]);
     const questMoteBase = packed.base.getMote(moteId) as
       | Mote<Crashlands2.Schemas['cl2_quest']>
       | undefined;
@@ -600,48 +515,11 @@ export async function updateChangesFromParsedQuest(
       updateMote('data/quest_receiver/item', parsed.quest_receiver);
     }
     updateMote('data/quest_start_log/text', parsed.quest_start_log);
-    updateMote('data/wip/draft', parsed.draft);
     updateMote('data/storyline', parsed.storyline);
 
-    const parsedComments = parsed.comments.filter((c) => !!c.text);
-    const parsedClues = parsed.clues.filter((c) => !!c.id && !!c.speaker);
+    updateWipChangesFromParsed(parsed, moteId, packed, trace);
 
-    //#region COMMENTS
-    // Add/Update COMMENTS
-    trace(`Updating comments`);
-    for (const comment of parsedComments) {
-      trace(`Updating comment ${comment.id} with text "${comment.text}"`);
-      updateMote(`data/wip/comments/${comment.id}/element`, comment.text);
-    }
-    // Remove deleted comments
-    for (const existingComment of bsArrayToArray(
-      questMoteBase?.data.wip?.comments || {},
-    )) {
-      if (!parsedComments.find((c) => c.id === existingComment.id)) {
-        trace(`Deleting comment ${existingComment.id}`);
-        updateMote(`data/wip/comments/${existingComment.id}`, null);
-      }
-    }
-    // Get the BASE order of the comments (if any) and use those
-    // as the starting point for an up to date order.
-    const comments = parsedComments.map((c) => {
-      // Look up the base comment
-      let comment = questMoteBase?.data.wip?.comments?.[c.id!];
-      if (!comment) {
-        comment = questMoteWorking?.data.wip?.comments?.[c.id!];
-        // @ts-expect-error - order is a required field, but it'll be re-added
-        delete comment?.order;
-      }
-      assert(comment, `Comment ${c.id} not found in base or working mote`);
-      return { ...comment, id: c.id! };
-    });
-    trace('Updating comment order');
-    updateBsArrayOrder(comments);
-    comments.forEach((comment) => {
-      trace(`Updating comment ${comment.id} order to ${comment.order}`);
-      updateMote(`data/wip/comments/${comment.id}/order`, comment.order);
-    });
-    //#endregion
+    const parsedClues = parsed.clues.filter((c) => !!c.id && !!c.speaker);
 
     //#region CLUES
     // Add/update clues
@@ -655,13 +533,11 @@ export async function updateChangesFromParsedQuest(
           `data/clues/${clue.id}/element/phrases/${phrase.id}/element/phrase/text/text`,
           phrase.text || '',
         );
-        if (phrase.emoji) {
-          trace(`Setting phrase ${phrase.id} emoji to "${phrase.emoji}"`);
-          updateMote(
-            `data/clues/${clue.id}/element/phrases/${phrase.id}/element/phrase/emoji`,
-            phrase.emoji,
-          );
-        }
+        trace(`Setting phrase ${phrase.id} emoji to "${phrase.emoji}"`);
+        updateMote(
+          `data/clues/${clue.id}/element/phrases/${phrase.id}/element/phrase/emoji`,
+          phrase.emoji,
+        );
       }
     }
     // Delete clues that were removed
@@ -886,7 +762,6 @@ export async function updateChangesFromParsedQuest(
           delete moment?.order;
         }
         assert(moment, `Moment ${m.id} not found in base or working mote`);
-        moment.element.style;
         const element = moment.element;
         if (element.style === 'Emote') {
           assert(m.kind === 'emote', `Expected moment ${m.id} to be an emote`);

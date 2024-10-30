@@ -15,6 +15,11 @@ export const commands = {
     title: 'Stitch: Open GameMaker Docs',
     [$showInPalette]: true,
   },
+  'stitch.newProject': {
+    command: 'stitch.newProject',
+    title: 'Stitch: New Project',
+    [$showInPalette]: true,
+  },
   'stitch.diagnostics.suppress': {
     command: 'stitch.diagnostics.suppress',
     title: 'Suppress Diagnostics',
@@ -191,12 +196,20 @@ export const commands = {
       group: 'navigation@5',
     },
   },
+  'stitch.assets.newRoom': {
+    command: 'stitch.assets.newRoom',
+    title: 'New Room...',
+    [$showInViewItemContextMenu]: {
+      when: when.viewItemIsFolder,
+      group: 'navigation@6',
+    },
+  },
   'stitch.assets.newShader': {
     command: 'stitch.assets.newShader',
     title: 'New Shader...',
     [$showInViewItemContextMenu]: {
       when: when.viewItemIsFolder,
-      group: 'navigation@6',
+      group: 'navigation@7',
     },
   },
   'stitch.assets.newFolder': {
@@ -217,6 +230,22 @@ export const commands = {
         group: 'inline@1',
       },
     ],
+  },
+  'stitch.assets.addRoomInstance': {
+    command: 'stitch.assets.addRoomInstance',
+    title: 'Add Instance...',
+    [$showInViewItemContextMenu]: {
+      when: when.viewItemIsRoom,
+      group: 'navigation@1',
+    },
+  },
+  'stitch.assets.deleteRoomInstance': {
+    command: 'stitch.assets.deleteRoomInstance',
+    title: 'Delete',
+    [$showInViewItemContextMenu]: {
+      when: when.viewItemIsRoomInstance,
+      group: 'navigation@1',
+    },
   },
   'stitch.assets.replaceSpriteFrames': {
     command: 'stitch.assets.replaceSpriteFrames',
@@ -300,6 +329,22 @@ export const commands = {
     [$showInViewTitle]: {
       when: when.runnerViewFocused,
       group: 'navigation@2',
+    },
+  },
+  'stitch.stop': {
+    command: 'stitch.stop',
+    title: 'Stitch: Stop Runner',
+    shortTitle: 'Stop',
+    icon: '$(debug-stop)',
+    enablement: when.hasProjects,
+    [$showInPalette]: true,
+    [$showInViewTitle]: {
+      when: `${when.runnerViewFocused} || (${when.assetTreeFocused} && ${when.runningInTerminal})`,
+      group: 'navigation@3',
+    },
+    [$showInViewItemContextMenu]: {
+      when: when.isInlineProject,
+      group: 'inline@3',
     },
   },
   'stitch.run': {

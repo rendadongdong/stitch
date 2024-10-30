@@ -1,5 +1,90 @@
 # Stitch Changelog
 
+## 1.71.0 (2024-10-18)
+
+### Features
+
+- Added 'stop' command and button to the runner, which kills igor and any running game instances.
+
+## 1.70.0 (2024-08-15)
+
+### Features
+
+- Added slot names to the Spine Sprite viewer
+
+## 1.69.5 (2024-07-17)
+
+### Fixes
+
+- JSDoc descriptions no longer remove inferred types
+
+## 1.69.4 (2024-07-15)
+
+### Docs
+
+- Added description of the Stitch Runner to the docs
+
+### Fixes
+
+- Error traces are now clickable in the runner view.
+
+## 1.69.3 (2024-07-15)
+
+### Fixes
+
+- Symbol search now only shows Function results for Functions that have the same name as their parent Script.
+
+## 1.69.2 (2024-06-21)
+
+### Fixes
+
+- Resolved issue where renaming a sound asset would not properly update the sound file reference, causing compiles to fail.
+
+## 1.69.0 (2024-04-29)
+
+### Features
+
+- Go-to-definition on a sound reference now takes you to the sound player instead of the yy file.
+- Updated all deps
+
+### Fixes
+
+- The 'Set Sprite' context menu entry now works again in the Inspector panel for objects
+
+## 1.68.3 (2024-03-26)
+
+### Fixes
+
+- Resolved formatting issues in the Runner logs caused by wrapping entries in the <pre> tag for horizontal spacing support
+
+## 1.68.2 (2024-03-26)
+
+### Fixes
+
+- Resolved issue where logged spaces are not shown in the Runner panel
+
+## 1.68.1 (2024-03-14)
+
+### Fixes
+
+- Running via command now focuses the Runner view, and styling is now properly restored on panel reload
+
+## 1.68.0 (2024-03-08)
+
+### Features
+
+- Added ability to delete room instances and drag-drop reorganize them.
+- Can now add object instances to rooms via the asset tree context menu
+- The asset tree now lists a room's object intances
+- Rooms can now be added via the resource tree context menu.
+
+## 1.67.0 (2024-03-08)
+
+### Features
+
+- Newly-created projects now ensure that the default object is instanced in the default room.
+- Added a command for creating a basic template project
+
 ## 1.66.2 (2024-03-07)
 
 ### Fixes

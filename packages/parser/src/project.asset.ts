@@ -6,11 +6,15 @@ import {
   YyExtension,
   YyObject,
   YyResourceType,
+  YyRoom,
+  YyRoomInstanceLayer,
   YySchemas,
   YySound,
   YySprite,
   YypResource,
   yyObjectEventSchema,
+  yyRoomInstanceLayerSchema,
+  yyRoomInstanceSchema,
   yySchemas,
   yySpriteSchema,
 } from '@bscotch/yy';
@@ -148,12 +152,16 @@ export class Asset<T extends YyResourceType = YyResourceType> {
     return this.assetKind === 'objects';
   }
 
-  get isSprite() {
-    return this.assetKind === 'sprites';
-  }
-
   get isSound() {
     return this.assetKind === 'sounds';
+  }
+
+  get isRoom() {
+    return this.assetKind === 'rooms';
+  }
+
+  get isSprite() {
+    return this.assetKind === 'sprites';
   }
 
   get isSpineSprite() {
@@ -285,6 +293,31 @@ export class Asset<T extends YyResourceType = YyResourceType> {
     } as any;
   }
 
+  get roomInstances(): { instanceId: string; object: Asset<'objects'> }[] {
+    assertIsAssetOfKind(this, 'rooms');
+    const instances = new Map<string, Asset<'objects'>>();
+    // Loop through each instance layer's instances to get IDs and objects
+    const yy = this.yy as YyRoom;
+    for (const layer of (yy as YyRoom).layers) {
+      if (layer.resourceType !== 'GMRInstanceLayer') {
+        continue;
+      }
+      for (const instance of (layer as YyRoomInstanceLayer).instances || []) {
+        const obj = this.project.getAssetByName(instance.objectId.name);
+        if (isAssetOfKind(obj, 'objects')) {
+          instances.set(instance.name, obj);
+        }
+      }
+    }
+    // Loop through the instance order to get everything in the expected order
+    return yy.instanceCreationOrder
+      .map((x) => ({
+        instanceId: x.name,
+        object: instances.get(x.name)!,
+      }))
+      .filter((x) => !!x.object);
+  }
+
   get frameIds(): string[] {
     if (this.assetKind !== 'sprites') {
       return [];
@@ -318,6 +351,107 @@ export class Asset<T extends YyResourceType = YyResourceType> {
       json: this.dir.join(`${frameId}.json`),
       atlas: this.dir.join(`${frameId}.atlas`),
     };
+  }
+
+  /**
+   * During an Object asset rename, we need to ensure that all references to the
+   * old name are updated to the new name. This includes the object's name in rooms.
+   */
+  @sequential
+  async renameRoomInstanceObjects(
+    oldObjectName: string,
+    newObjectName: string,
+  ) {
+    assert(this.isRoom, 'Can only rename object instances in rooms'); // Iterate through each instance layer and remove any instances with the given ID
+    const yy = this.yy as YyRoom;
+    let didUpdate = false;
+    for (const layer of yy.layers) {
+      if (layer.resourceType !== 'GMRInstanceLayer') {
+        continue;
+      }
+      layer.instances.forEach((instance) => {
+        if (
+          instance.objectId.name.toLowerCase() === oldObjectName.toLowerCase()
+        ) {
+          instance.objectId.name = newObjectName;
+          instance.objectId.path = `objects/${newObjectName}/${newObjectName}.yy`;
+          didUpdate = true;
+        }
+      });
+    }
+    if (didUpdate) {
+      await this.saveYy();
+    }
+  }
+
+  @sequential
+  async removeRoomInstance(instanceId: string) {
+    assert(this.isRoom, 'Can only add object instances to rooms');
+    const yy = this.yy as YyRoom;
+    // Iterate through each instance layer and remove any instances with the given ID
+    for (const layer of yy.layers) {
+      if (layer.resourceType !== 'GMRInstanceLayer') {
+        continue;
+      }
+      layer.instances = (layer.instances || []).filter(
+        (x) => x.name !== instanceId,
+      );
+    }
+    // Remove the instance from the creation order
+    yy.instanceCreationOrder = (yy.instanceCreationOrder || []).filter(
+      (x) => x.name !== instanceId,
+    );
+    await this.saveYy();
+  }
+
+  @sequential
+  async reorganizeRoomInstances(instanceIds: string[]) {
+    assert(this.isRoom, 'Can only add object instances to rooms');
+    const instanceIdsSet = new Set(instanceIds);
+    assert(
+      instanceIds.length === instanceIdsSet.size,
+      'Cannot have duplicate instance IDs',
+    );
+    const yy = this.yy as YyRoom;
+    const currentIds = new Set(yy.instanceCreationOrder.map((x) => x.name));
+    // Ensure that the new order includes all existing instances
+    assert(
+      instanceIdsSet.size === currentIds.size &&
+        [...instanceIdsSet].every((x) => currentIds.has(x)),
+      'New order must include all existing instances',
+    );
+    yy.instanceCreationOrder = instanceIds.map((name) => ({
+      name,
+      path: `rooms/${this.name}/${this.name}.yy`,
+    }));
+    await this.saveYy();
+  }
+
+  @sequential
+  async addRoomInstance(obj: Asset<'objects'>, x = 0, y = 0) {
+    assert(this.isRoom, 'Can only add object instances to rooms');
+    const yy = this.yy as YyRoom;
+    // Ensure we have an instance layer
+    let instanceLayer = yy.layers.find(
+      (x) => x.resourceType === 'GMRInstanceLayer',
+    ) as YyRoomInstanceLayer | undefined;
+    if (!instanceLayer) {
+      instanceLayer = yyRoomInstanceLayerSchema.parse({});
+      yy.layers.unshift(instanceLayer);
+    }
+    // Add a new instance
+    const instance = yyRoomInstanceSchema.parse({
+      objectId: obj.resource.id,
+      x,
+      y,
+    });
+    instanceLayer.instances.push(instance);
+    yy.instanceCreationOrder ||= [];
+    yy.instanceCreationOrder.push({
+      name: instance.name,
+      path: `rooms/${this.name}/${this.name}.yy`,
+    });
+    await this.saveYy();
   }
 
   get folder() {

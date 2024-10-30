@@ -32,6 +32,8 @@ export const when = {
   viewItemIsFolder: 'viewItem == folder',
   viewItemIsAsset: 'viewItem =~ /^asset-/',
   viewItemIsObject: 'viewItem == asset-objects',
+  viewItemIsRoom: 'viewItem == asset-rooms',
+  viewItemIsRoomInstance: 'viewItem == room-instance',
   viewItemIsSprite: 'viewItem == asset-sprites',
   viewItemIsSpriteFrame: 'viewItem == sprite-frame',
   viewItemIsCode: 'viewItem == code',

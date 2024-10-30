@@ -1,5 +1,5 @@
+import { StorylineMote } from './cl2.shared.types.js';
 import type { GameChanger } from './GameChanger.js';
-import { type StorylineMote } from './cl2.storyline.types.js';
 import { bsArrayToArray, toArrayTag } from './helpers.js';
 
 export function stringifyStoryline(
@@ -10,16 +10,21 @@ export function stringifyStoryline(
   const blocks: string[] = [
     `Name: ${packed.working.getMoteName(mote)}`,
     `Description: ${mote.data.description?.text || ''}\n`,
-    `Draft: ${mote.data.wip?.draft ? 'true' : 'false'}\n`,
   ];
 
+  if (mote.data.wip?.staging) {
+    blocks.push(`Stage: ${mote.data.wip.staging}\n`);
+  } else {
+    blocks.push('');
+  }
+
   // NOTES
-  if (mote.data.wip?.comments) {
-    const comments = bsArrayToArray(mote.data.wip.comments);
+  if (mote.data.wip?.notes) {
+    const comments = bsArrayToArray(mote.data.wip.notes);
     if (comments.length) {
       blocks.push(
-        ...bsArrayToArray(mote.data.wip.comments).map(
-          (c) => `//${toArrayTag(c.id)} ${c.element}`,
+        ...bsArrayToArray(mote.data.wip.notes).map(
+          (c) => `//${toArrayTag(c.id)} ${c.element.text}`,
         ),
         '',
       );

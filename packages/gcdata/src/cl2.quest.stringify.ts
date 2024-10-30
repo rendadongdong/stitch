@@ -1,9 +1,9 @@
 import type { GameChanger } from './GameChanger.js';
-import { assert } from './assert.js';
+import { characterString, emojiString } from './cl2.shared.stringify.js';
 import type { Crashlands2 } from './cl2.types.auto.js';
 import { bsArrayToArray, toArrayTag, toMoteTag } from './helpers.js';
 import type { Mote } from './types.js';
-import { capitalize } from './util.js';
+import { capitalize, cleanGameChangerString } from './util.js';
 
 export function stringifyQuest(
   mote: Mote<Crashlands2.Quest>,
@@ -17,16 +17,20 @@ export function stringifyQuest(
       (storyline
         ? `${packed.working.getMoteName(storyline)}${toMoteTag(storyline)}`
         : ''),
-    `Draft: ${mote.data.wip?.draft ? 'true' : 'false'}\n`,
   ];
+  if (mote.data.wip?.staging) {
+    blocks.push(`Stage: ${mote.data.wip.staging}\n`);
+  } else {
+    blocks.push('');
+  }
 
   // NOTES
-  if (mote.data.wip?.comments) {
-    const comments = bsArrayToArray(mote.data.wip.comments);
+  if (mote.data.wip?.notes) {
+    const comments = bsArrayToArray(mote.data.wip.notes);
     if (comments.length) {
       blocks.push(
-        ...bsArrayToArray(mote.data.wip.comments).map(
-          (c) => `//${toArrayTag(c.id)} ${c.element}`,
+        ...bsArrayToArray(mote.data.wip.notes).map(
+          (c) => `//${toArrayTag(c.id)} ${c.element.text}`,
         ),
         '',
       );
@@ -102,9 +106,9 @@ export function stringifyQuest(
         if (moment.style === 'Dialogue') {
           // Speaker and dialog line
           if (moment.speech.speaker !== lastSpeaker) {
-            line += `\t${characterString(moment.speech.speaker)}\n`;
+            line += `\t${characterString(moment.speech.speaker, packed)}\n`;
           }
-          const emojiStr = emojiString(moment.speech.emotion);
+          const emojiStr = emojiString(moment.speech.emotion, packed);
           line += `>${toArrayTag(momentContainer)} ${
             emojiStr ? emojiStr + ' ' : ''
           }${moment.speech.text.text}`;
@@ -116,7 +120,8 @@ export function stringifyQuest(
             emojiLines.push(
               `!${toArrayTag(emote)} ${characterString(
                 emote.element?.key!,
-              )} ${emojiString(emote.element?.value)}`,
+                packed,
+              )} ${emojiString(emote.element?.value, packed)}`,
             );
           }
           line += emojiLines.join('\n');
@@ -132,7 +137,10 @@ export function stringifyQuest(
     if (momentType === 'start') {
       // Start Log
       if (mote.data.quest_start_log) {
-        blocks.push(`Log: ${mote.data.quest_start_log.text}`, '');
+        blocks.push(
+          `Log: ${cleanGameChangerString(mote.data.quest_start_log.text)}`,
+          '',
+        );
       }
       // Clues
       if (mote.data.clues) {
@@ -165,21 +173,6 @@ export function stringifyQuest(
         }
       }
     }
-  }
-
-  function emojiString(emojiId: string | undefined) {
-    if (!emojiId) return '';
-    const emoji = packed.working.getMote(emojiId);
-    const name = packed.working.getMoteName(emoji) || emoji?.id || 'UNKNOWN';
-    return name ? `(${name})` : '';
-  }
-
-  function characterString(characterId: string) {
-    assert(characterId, 'Character ID must be defined');
-    const character = packed.working.getMote(characterId);
-    const name =
-      packed.working.getMoteName(character) || character?.id || 'UNKNOWN';
-    return name ? `${name.toUpperCase()}${toMoteTag(characterId)}` : '';
   }
 
   return blocks.join('\n') + '\n';

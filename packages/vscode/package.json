@@ -1,7 +1,7 @@
 {
   "name": "bscotch-stitch-vscode",
   "displayName": "Stitch",
-  "version": "1.66.2",
+  "version": "1.71.0",
   "private": true,
   "description": "GameMaker Language (GML) support and related tools for Visual Studio Code",
   "categories": [
@@ -44,6 +44,10 @@
       {
         "command": "stitch.openDocs",
         "title": "Stitch: Open GameMaker Docs"
+      },
+      {
+        "command": "stitch.newProject",
+        "title": "Stitch: New Project"
       },
       {
         "command": "stitch.diagnostics.suppress",
@@ -152,6 +156,10 @@
         "title": "Add/Update Sounds..."
       },
       {
+        "command": "stitch.assets.newRoom",
+        "title": "New Room..."
+      },
+      {
         "command": "stitch.assets.newShader",
         "title": "New Shader..."
       },
@@ -159,6 +167,14 @@
         "command": "stitch.assets.newFolder",
         "title": "New Group...",
         "icon": "$(new-folder)"
+      },
+      {
+        "command": "stitch.assets.addRoomInstance",
+        "title": "Add Instance..."
+      },
+      {
+        "command": "stitch.assets.deleteRoomInstance",
+        "title": "Delete"
       },
       {
         "command": "stitch.assets.replaceSpriteFrames",
@@ -201,6 +217,13 @@
         "command": "stitch.runner.refresh",
         "title": "Refresh",
         "icon": "$(sync)",
+        "enablement": "stitch.projectCount > 0"
+      },
+      {
+        "command": "stitch.stop",
+        "title": "Stitch: Stop Runner",
+        "shortTitle": "Stop",
+        "icon": "$(debug-stop)",
         "enablement": "stitch.projectCount > 0"
       },
       {
@@ -634,6 +657,11 @@
           "group": "navigation@2"
         },
         {
+          "command": "stitch.stop",
+          "when": "view == bscotch-stitch-igor || (view == bscotch-stitch-resources && config.stitch.run.inTerminal)",
+          "group": "navigation@3"
+        },
+        {
           "command": "stitch.run",
           "when": "view == bscotch-stitch-igor || (view == bscotch-stitch-resources && config.stitch.run.inTerminal)",
           "group": "navigation@5"
@@ -751,9 +779,14 @@
           "group": "navigation@5"
         },
         {
-          "command": "stitch.assets.newShader",
+          "command": "stitch.assets.newRoom",
           "when": "viewItem == folder",
           "group": "navigation@6"
+        },
+        {
+          "command": "stitch.assets.newShader",
+          "when": "viewItem == folder",
+          "group": "navigation@7"
         },
         {
           "command": "stitch.assets.newFolder",
@@ -764,6 +797,16 @@
           "command": "stitch.assets.newFolder",
           "when": "view == bscotch-stitch-resources && stitch.projectCount > 0 && viewItem == project",
           "group": "inline@1"
+        },
+        {
+          "command": "stitch.assets.addRoomInstance",
+          "when": "viewItem == asset-rooms",
+          "group": "navigation@1"
+        },
+        {
+          "command": "stitch.assets.deleteRoomInstance",
+          "when": "viewItem == room-instance",
+          "group": "navigation@1"
         },
         {
           "command": "stitch.assets.replaceSpriteFrames",
@@ -797,6 +840,11 @@
         },
         {
           "command": "stitch.openIde",
+          "when": "view == bscotch-stitch-resources && stitch.projectCount > 0 && viewItem == project",
+          "group": "inline@3"
+        },
+        {
+          "command": "stitch.stop",
           "when": "view == bscotch-stitch-resources && stitch.projectCount > 0 && viewItem == project",
           "group": "inline@3"
         },
@@ -868,6 +916,9 @@
           "command": "stitch.openDocs"
         },
         {
+          "command": "stitch.newProject"
+        },
+        {
           "command": "stitch.openLocation.gameMaker"
         },
         {
@@ -887,6 +938,9 @@
         },
         {
           "command": "stitch.openIde"
+        },
+        {
+          "command": "stitch.stop"
         },
         {
           "command": "stitch.run"
@@ -1031,31 +1085,31 @@
     "@bscotch/sprite-source": "workspace:*",
     "@bscotch/stitch-config": "workspace:*",
     "@bscotch/stitch-launcher": "workspace:*",
-    "@bscotch/trebuchet": "2.9.3",
+    "@bscotch/trebuchet": "2.9.4",
     "@bscotch/utility": "^7.2.0",
     "@bscotch/yy": "workspace:*",
-    "@esotericsoftware/spine-player": "4.2.26",
+    "@esotericsoftware/spine-player": "4.2.39",
     "@local-vscode/shared": "workspace:*",
     "@local-vscode/webviews": "workspace:*",
     "@types/plist": "3.0.5",
-    "@types/vscode": "1.84.1",
+    "@types/vscode": "1.88.0",
     "@types/xml2js": "0.4.14",
-    "@vscode/vsce": "2.22.0",
-    "dotenv": "16.3.1",
-    "esbuild": "^0.19.5",
-    "glob": "10.3.10",
-    "nodemon": "^3.0.1",
+    "@vscode/vsce": "2.26.0",
+    "dotenv": "16.4.5",
+    "esbuild": "^0.20.2",
+    "glob": "10.3.12",
+    "nodemon": "^3.1.0",
     "plist": "3.1.0",
-    "turbo": "^1.10.16",
-    "typescript": "5.2.2",
+    "turbo": "^1.13.3",
+    "typescript": "5.5.0-beta",
     "xml2js": "0.6.2",
-    "yaml": "2.3.4",
-    "zod": "^3.22.4",
-    "zod-to-json-schema": "3.21.4",
-    "zx": "^7.2.3"
+    "yaml": "2.4.2",
+    "zod": "^3.23.4",
+    "zod-to-json-schema": "3.23.0",
+    "zx": "^8.0.2"
   },
   "engines": {
-    "vscode": "^1.84.0"
+    "vscode": "^1.88.0"
   },
   "icon": "./images/stitch-logo.png",
   "galleryBanner": {
